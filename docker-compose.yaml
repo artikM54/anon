@@ -1,0 +1,35 @@
+version: '3.8'
+services:
+  app:
+    build:
+      context: ./
+      dockerfile: docker/go/Dockerfile
+    image: anon-image
+    container_name: anon-app
+    restart: unless-stopped
+    working_dir: /app
+    depends_on: 
+      - redis
+    volumes:
+      - ./:/app
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.anon-app.rule=Host(`anon.localhost`)"
+    - "traefik.http.routers.anon-app.entrypoints=web"
+    - "traefik.http.services.anon-app.loadbalancer.server.port=8080"
+    networks:
+      - proxy
+
+  redis:
+    image: "redis:alpine"
+    container_name: anon-redis
+    restart: unless-stopped
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.services.anon-redis.loadbalancer.server.port=6379"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
