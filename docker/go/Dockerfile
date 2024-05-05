@@ -4,4 +4,7 @@ RUN mkdir /app
 WORKDIR /app
 ADD . /app
 
-CMD CONFIG_PATH="./" go run ./cmd/text_chat/main.go
+RUN go get github.com/cespare/reflex
+RUN go install github.com/cespare/reflex
+
+CMD reflex -r '\.go$' -s -- sh -c 'CONFIG_PATH="./" go run ./cmd/text_chat/main.go'
