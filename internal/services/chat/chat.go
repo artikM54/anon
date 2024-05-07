@@ -12,15 +12,37 @@ import (
 
 var userQueue []*userModel.User
 
-func AddUserToQueue(user *userModel.User) {
+func TryCreateChat(user *userModel.User) {
+	addUserToQueue(user)
+
+	if getCountUsersIntoQueue() >= 2 {
+		bindUser()
+	} else {
+		notifyWait(user)
+	}
+}
+
+func addUserToQueue(user *userModel.User) {
 	userQueue = append(userQueue, user)
 }
 
-func GetCountUsersIntoQueue() int {
+func getCountUsersIntoQueue() int {
 	return len(userQueue)
 }
 
-func BindClients() {
+func notifyWait(user *userModel.User) {
+	message := messageModel.NewMessage(
+		"wait",
+		string("Нет свободных участников, пожалуйста, дождитесь свободного участника"),
+	)
+
+	if err := sendMessage(user, message); err != nil {
+		log.Println("Error sending message to client 2: ", err)
+		return
+	}
+}
+
+func bindUser() {
 	fmt.Println("There are two users")
 
 	user1, user2, err := chooseRandomPair()
@@ -62,6 +84,7 @@ func HandleStreamMessages(user1 *userModel.User, user2 *userModel.User) {
 		_, textMessage, err := user1.Conn.ReadMessage()
 		if err != nil {
 			log.Println("Error reading message from client 1:", err)
+			closeUserConn(user2)
 			return
 		}
 
@@ -70,18 +93,31 @@ func HandleStreamMessages(user1 *userModel.User, user2 *userModel.User) {
 			string(textMessage),
 		)
 
-		if err := SendMessage(user2, message); err != nil {
+		if err := sendMessage(user2, message); err != nil {
 			log.Println("Error sending message to client 2: ", err)
 			return
 		}
 	}
 }
 
-func SendMessage(user *userModel.User, message *messageModel.Message) error {
+func sendMessage(user *userModel.User, message *messageModel.Message) error {
 	data, err := json.Marshal(message)
 	if err != nil {
 		log.Println("Error encoding message to JSON: ", err)
 	}
 
 	return user.Conn.WriteMessage(websocket.TextMessage, data)
+}
+
+func closeUserConn(user *userModel.User) {
+	message := messageModel.NewMessage(
+		"closed",
+		string("Собеседнкик покинул чат"),
+	)
+
+	if err := sendMessage(user, message); err != nil {
+		log.Println("Error sending message to client 2: ", err)
+	}
+
+	user.Conn.Close()
 }

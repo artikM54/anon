@@ -1,7 +1,6 @@
 package main_routes
 
 import (
-	messageModel "anonymous_chat/internal/models/message"
 	userModel "anonymous_chat/internal/models/user"
 	chatService "anonymous_chat/internal/services/chat"
 	"fmt"
@@ -34,24 +33,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: implement closing connects
-	// defer conn.Close()
-
 	user := userModel.NewUser(conn)
-	chatService.AddUserToQueue(user)
-
-	// TODO: move to a queue handler
-	if chatService.GetCountUsersIntoQueue() >= 2 {
-		chatService.BindClients()
-	} else {
-		message := messageModel.NewMessage(
-			"system",
-			string("Нет свободных участников, пожалуйста, дождитесь свободного участника"),
-		)
-
-		if err := chatService.SendMessage(user, message); err != nil {
-			log.Println("Error sending message to client 2: ", err)
-			return
-		}
-	}
+	chatService.TryCreateChat(user)
 }
