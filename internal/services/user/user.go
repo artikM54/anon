@@ -7,9 +7,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func NewUser(conn *websocket.Conn) *userModel.User {
+func NewUser(conn *websocket.Conn, hash string) *userModel.User {
+	if hash == "" {
+        hash = hashUtil.CreateUniqueModelHash(userModel.RedisList)
+    }
+	
 	return &userModel.User{
-		Hash: hashUtil.CreateUniqueModelHash(userModel.RedisList),
+		Hash: hash,
 		Conn: conn,
 	}
 }
