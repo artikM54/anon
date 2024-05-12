@@ -3,7 +3,9 @@ package main_routes
 import (
 	"anonymous_chat/internal/handler_queue"
 	messageModel "anonymous_chat/internal/models/message"
+	userModel "anonymous_chat/internal/models/user"
 	userService "anonymous_chat/internal/services/user"
+	hashUtil "anonymous_chat/internal/utils/hash"
 	"anonymous_chat/internal/utils/sender"
 	"encoding/json"
 	"fmt"
@@ -41,6 +43,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleConn(conn *websocket.Conn) {
+	fmt.Println("HANDLER COMMANDS ", time.Now().Format("2006-01-02 15:04:05"))
 	message := messageModel.NewMessage(
 		"CONNECT",
 		"SUCCESS",
@@ -53,6 +56,10 @@ func handleConn(conn *websocket.Conn) {
 		log.Println("Error sending message to client 2: ", err)
 		return
 	}
+
+	var wasCommand bool
+	var token = message.Payload.UserHash
+	var user *userModel.User
 
 	for {
 		_, data, err := conn.ReadMessage()
@@ -72,17 +79,35 @@ func handleConn(conn *websocket.Conn) {
 
 		switch message.Category {
 		case "FRONT:GET_TOKEN":
-			fmt.Println("FRONT:GET_TOKEN")
-			user := userService.NewUser(conn, "")
-			sender.NotifyToken(user)
-			handler_queue.AddUserToQueue(user)
-			return
-		case "FRONT:GIVE_TOKEN":
-			fmt.Println("FRONT:GIVE_TOKEN")
-			user := userService.NewUser(conn, message.Payload.Text)
-			handler_queue.AddUserToQueue(user)
-			return
+			if wasCommand {
+				continue
+			}
 
+			fmt.Println("FRONT:GET_TOKEN")
+			token = hashUtil.CreateUniqueModelHash(userModel.RedisList)
+			sender.NotifyToken(conn, token)
+
+			wasCommand = true
+		case "FRONT:GIVE_TOKEN":
+			if wasCommand {
+				continue
+			}
+
+			fmt.Println("FRONT:GIVE_TOKEN")
+			token = message.Payload.Text
+
+			wasCommand = true
+		case "FRONT:START_QUEUE":
+			if token == "" {
+				continue
+			}
+
+			fmt.Println("FRONT:START_QUEUE ", time.Now().Format("2006-01-02 15:04:05"))
+
+			user = userService.NewUser(conn, token)
+			handler_queue.AddUserToQueue(user)
+
+			return
 		default:
 			fmt.Println("Undefined command")
 		}
