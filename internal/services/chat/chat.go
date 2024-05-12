@@ -1,121 +1,110 @@
 package chat
 
 import (
+	chatModel "anonymous_chat/internal/models/chat"
 	messageModel "anonymous_chat/internal/models/message"
 	userModel "anonymous_chat/internal/models/user"
+	chatRepository "anonymous_chat/internal/repositories/chat"
+	hashUtil "anonymous_chat/internal/utils/hash"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
+
 	"log"
-	"math/rand"
+	"time"
+
+	"github.com/gorilla/websocket"
 )
 
-var userQueue []*userModel.User
+type ChatService struct {
+	chat           *chatModel.Chat
+	chatRepository *chatRepository.ChatRepository
+}
 
-func TryCreateChat(user *userModel.User) {
-	addUserToQueue(user)
+func NewChatService(users []*userModel.User) *ChatService {
+	chat := newChat(users)
 
-	if getCountUsersIntoQueue() >= 2 {
-		bindUser()
-	} else {
-		notifyWait(user)
+	return &ChatService{
+		chat:           chat,
+		chatRepository: chatRepository.NewChatRepository(chat.Hash),
 	}
 }
 
-func addUserToQueue(user *userModel.User) {
-	userQueue = append(userQueue, user)
-}
-
-func getCountUsersIntoQueue() int {
-	return len(userQueue)
-}
-
-func notifyWait(user *userModel.User) {
-	message := messageModel.NewMessage(
-		"wait",
-		string("Нет свободных участников, пожалуйста, дождитесь свободного участника"),
-	)
-
-	if err := sendMessage(user, message); err != nil {
-		log.Println("Error sending message to client 2: ", err)
-		return
+func newChat(users []*userModel.User) *chatModel.Chat {
+	return &chatModel.Chat{
+		Hash:  hashUtil.CreateUniqueModelHash(chatModel.RedisList),
+		Users: users,
 	}
 }
 
-func bindUser() {
-	fmt.Println("There are two users")
+func (c *ChatService) Start() {
+	fmt.Println("chat is starting")
 
-	user1, user2, err := chooseRandomPair()
-	if err != nil {
-		log.Println("Error choosing random pair:", err)
-		return
+	for _, user := range c.chat.Users {
+		c.NotifyChatStart(user)
 	}
 
-	userQueue = removeClientFromSlice(userQueue, user1)
-	userQueue = removeClientFromSlice(userQueue, user2)
-
-	go HandleStreamMessages(user1, user2)
-	go HandleStreamMessages(user2, user1)
+	go c.HandleStreamMessages(c.chat.Users[0], c.chat.Users[1])
+	go c.HandleStreamMessages(c.chat.Users[1], c.chat.Users[0])
 }
 
-func chooseRandomPair() (*userModel.User, *userModel.User, error) {
-	idx1 := rand.Intn(len(userQueue))
-	idx2 := rand.Intn(len(userQueue))
-
-	for idx2 == idx1 {
-		idx2 = rand.Intn(len(userQueue))
-	}
-
-	return userQueue[idx1], userQueue[idx2], nil
-}
-
-func removeClientFromSlice(slice []*userModel.User, user *userModel.User) []*userModel.User {
-	for i, c := range slice {
-		if c == user {
-			return append(slice[:i], slice[i+1:]...)
-		}
-	}
-
-	return slice
-}
-
-func HandleStreamMessages(user1 *userModel.User, user2 *userModel.User) {
+func (c *ChatService) HandleStreamMessages(user1 *userModel.User, user2 *userModel.User) {
 	for {
 		_, textMessage, err := user1.Conn.ReadMessage()
 		if err != nil {
 			log.Println("Error reading message from client 1:", err)
-			closeUserConn(user2)
+			c.closeUserConn(user2)
 			return
 		}
 
-		message := messageModel.NewMessage(
-			"chat",
-			string(textMessage),
-		)
+		var message messageModel.Message
+		json.Unmarshal(textMessage, &message)
 
-		if err := sendMessage(user2, message); err != nil {
+		message.Category = "CHAT"
+		message.Payload.Timestamp = time.Now().Format("2000-01-01 00:00:00")
+		message.Payload.UserHash = user1.Hash
+		message.Payload.ChatHash = c.chat.Hash
+
+		if err := c.SendMessage(user2.Conn, &message); err != nil {
 			log.Println("Error sending message to client 2: ", err)
 			return
 		}
 	}
 }
 
-func sendMessage(user *userModel.User, message *messageModel.Message) error {
+func (c *ChatService) NotifyChatStart(user *userModel.User) {
+	message := messageModel.NewMessage(
+		"CHAT_START",
+		c.chat.Hash,
+		time.Now().Format("2006-01-02 15:04:05"),
+		"",
+		"",
+	)
+
+	if err := c.SendMessage(user.Conn, message); err != nil {
+		log.Println("Error sending message to client 2: ", err)
+		return
+	}
+}
+
+func (c *ChatService) SendMessage(conn *websocket.Conn, message *messageModel.Message) error {
 	data, err := json.Marshal(message)
 	if err != nil {
 		log.Println("Error encoding message to JSON: ", err)
 	}
 
-	return user.Conn.WriteMessage(websocket.TextMessage, data)
+	return conn.WriteMessage(websocket.TextMessage, data)
 }
 
-func closeUserConn(user *userModel.User) {
+func (c *ChatService) closeUserConn(user *userModel.User) {
 	message := messageModel.NewMessage(
-		"closed",
+		"CLOSE",
 		string("Собеседнкик покинул чат"),
+		time.Now().Format("2000-01-01 00:00:00"),
+		"",
+		"",
 	)
 
-	if err := sendMessage(user, message); err != nil {
+	if err := c.SendMessage(user.Conn, message); err != nil {
 		log.Println("Error sending message to client 2: ", err)
 	}
 

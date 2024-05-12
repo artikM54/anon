@@ -4,10 +4,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type User struct {
-	Conn *websocket.Conn
-}
+const(
+    RedisList = "unique_users"
+)
 
-func NewUser(conn *websocket.Conn) *User {
-	return &User{Conn: conn}
+type User struct {
+	Hash string
+	Conn *websocket.Conn
 }
