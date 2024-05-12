@@ -2,7 +2,6 @@ package sender
 
 import (
 	messageModel "anonymous_chat/internal/models/message"
-	userModel "anonymous_chat/internal/models/user"
 	"encoding/json"
 	"github.com/gorilla/websocket"
 	"log"
@@ -18,16 +17,16 @@ func SendMessage(conn *websocket.Conn, message *messageModel.Message) error {
 	return conn.WriteMessage(websocket.TextMessage, data)
 }
 
-func NotifyToken(user *userModel.User) {
+func NotifyToken(conn *websocket.Conn, token string) {
 	message := messageModel.NewMessage(
 		"TOKEN",
-		user.Hash,
+		token,
 		time.Now().Format("2006-01-02 15:04:05"),
 		"",
 		"",
 	)
 
-	if err := SendMessage(user.Conn, message); err != nil {
+	if err := SendMessage(conn, message); err != nil {
 		log.Println("Error sending message to client 2: ", err)
 		return
 	}

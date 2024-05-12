@@ -18,14 +18,16 @@ import (
 type ChatService struct {
 	chat           *chatModel.Chat
 	chatRepository *chatRepository.ChatRepository
+	queue          *[]*userModel.User
 }
 
-func NewChatService(users []*userModel.User) *ChatService {
+func NewChatService(users []*userModel.User, queue *[]*userModel.User) *ChatService {
 	chat := newChat(users)
 
 	return &ChatService{
 		chat:           chat,
 		chatRepository: chatRepository.NewChatRepository(chat.Hash),
+		queue:          queue,
 	}
 }
 
@@ -34,6 +36,11 @@ func newChat(users []*userModel.User) *chatModel.Chat {
 		Hash:  hashUtil.CreateUniqueModelHash(chatModel.RedisList),
 		Users: users,
 	}
+}
+
+func (c *ChatService) AddUserToQueue(user *userModel.User) {
+	slice := append(*c.queue, user)
+	*c.queue = slice
 }
 
 func (c *ChatService) Start() {
@@ -59,15 +66,36 @@ func (c *ChatService) HandleStreamMessages(user1 *userModel.User, user2 *userMod
 		var message messageModel.Message
 		json.Unmarshal(textMessage, &message)
 
-		message.Category = "CHAT"
-		message.Payload.Timestamp = time.Now().Format("2000-01-01 00:00:00")
-		message.Payload.UserHash = user1.Hash
-		message.Payload.ChatHash = c.chat.Hash
+		switch message.Category {
+		case "CHAT":
+			message.Category = "CHAT"
+			message.Payload.Timestamp = time.Now().Format("2006-01-02 15:04:05")
+			message.Payload.UserHash = user1.Hash
+			message.Payload.ChatHash = c.chat.Hash
 
-		if err := c.SendMessage(user2.Conn, &message); err != nil {
-			log.Println("Error sending message to client 2: ", err)
+			if err := c.SendMessage(user2.Conn, &message); err != nil {
+				log.Println("Error sending message to client 2: ", err)
+				return
+			}
+		case "FRONT:CHAT_EXIT":
+			fmt.Println("FRONT:CHAT_EXIT HandleStreamMessages ", time.Now().Format("2006-01-02 15:04:05"))
+			message.Category = "CHAT_EXIT"
+			message.Payload.Timestamp = time.Now().Format("2006-01-02 15:04:05")
+			message.Payload.UserHash = ""
+			message.Payload.ChatHash = ""
+
+			if err := c.SendMessage(user2.Conn, &message); err != nil {
+				log.Println("Error sending message to client 2: ", err)
+				return
+			}
+		case "FRONT:START_QUEUE":
+			fmt.Println("FRONT:START_QUEUE HandleStreamMessages ", time.Now().Format("2006-01-02 15:04:05"))
+
+			c.AddUserToQueue(user1)
+
 			return
 		}
+
 	}
 }
 

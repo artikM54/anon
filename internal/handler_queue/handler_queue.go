@@ -43,7 +43,7 @@ func bindUser() {
 		userQueue = removeClientFromSlice(userQueue, user)
 	}
 
-	c := chatService.NewChatService(users)
+	c := chatService.NewChatService(users, &userQueue)
 
 	go c.Start()
 }
