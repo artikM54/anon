@@ -48,18 +48,23 @@ func (c *ChatService) Start() {
 
 	for _, user := range c.chat.Users {
 		c.NotifyChatStart(user)
+		c.chatRepository.RegisterUserToStream(user.Hash)
 	}
 
-	go c.HandleStreamMessages(c.chat.Users[0], c.chat.Users[1])
-	go c.HandleStreamMessages(c.chat.Users[1], c.chat.Users[0])
+	for _, user := range c.chat.Users {
+		go c.write(user)
+		go c.read(user)
+	}
 }
 
-func (c *ChatService) HandleStreamMessages(user1 *userModel.User, user2 *userModel.User) {
+func (c *ChatService) write(user *userModel.User) {
 	for {
-		_, textMessage, err := user1.Conn.ReadMessage()
+		_, textMessage, err := user.Conn.ReadMessage()
 		if err != nil {
-			log.Println("Error reading message from client 1:", err)
-			c.closeUserConn(user2)
+			log.Println("Error reading message from user connection 1:", err)
+
+			// TODO notify other users
+			// c.closeUserConn(user2)
 			return
 		}
 
@@ -70,13 +75,10 @@ func (c *ChatService) HandleStreamMessages(user1 *userModel.User, user2 *userMod
 		case "CHAT":
 			message.Category = "CHAT"
 			message.Payload.Timestamp = time.Now().Format("2006-01-02 15:04:05")
-			message.Payload.UserHash = user1.Hash
+			message.Payload.UserHash = user.Hash
 			message.Payload.ChatHash = c.chat.Hash
 
-			if err := c.SendMessage(user2.Conn, &message); err != nil {
-				log.Println("Error sending message to client 2: ", err)
-				return
-			}
+			c.chatRepository.AddMessage(message)
 		case "FRONT:CHAT_EXIT":
 			fmt.Println("FRONT:CHAT_EXIT HandleStreamMessages ", time.Now().Format("2006-01-02 15:04:05"))
 			message.Category = "CHAT_EXIT"
@@ -84,18 +86,37 @@ func (c *ChatService) HandleStreamMessages(user1 *userModel.User, user2 *userMod
 			message.Payload.UserHash = ""
 			message.Payload.ChatHash = ""
 
-			if err := c.SendMessage(user2.Conn, &message); err != nil {
-				log.Println("Error sending message to client 2: ", err)
-				return
-			}
+			//TODO handler this case within the redis stream 
 		case "FRONT:START_QUEUE":
 			fmt.Println("FRONT:START_QUEUE HandleStreamMessages ", time.Now().Format("2006-01-02 15:04:05"))
 
-			c.AddUserToQueue(user1)
+			c.AddUserToQueue(user)
 
 			return
 		}
+	}
+}
 
+func (c *ChatService) read(user *userModel.User) {
+	for {
+		streams := c.chatRepository.GetNewMessages(user.Hash)
+
+		for _, stream := range streams {
+			for _, message := range stream.Messages {
+				messageData := message.Values["message"].(string)
+
+				var message messageModel.Message
+				json.Unmarshal([]byte(messageData), &message)
+
+				fmt.Println("Received message data:", messageData)
+
+				if user.Hash == message.Payload.UserHash {
+					continue
+				}
+
+				c.SendMessage(user.Conn, &message)
+			}
+		}
 	}
 }
 

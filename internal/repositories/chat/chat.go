@@ -1,14 +1,18 @@
 package chat
 
 import (
-	"anonymous_chat/internal/redis"
+	messageModel "anonymous_chat/internal/models/message"
+	redisUtil "anonymous_chat/internal/redis"
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/redis/go-redis/v9"
 )
 
 type ChatRepository struct {
 	redisListKeyParticipants string
 	redisListKeyMessages     string
+	redisStream              string
 	ctx                      context.Context
 }
 
@@ -16,13 +20,14 @@ func NewChatRepository(chatHash string) *ChatRepository {
 	return &ChatRepository{
 		redisListKeyParticipants: "chat_participants:" + chatHash,
 		redisListKeyMessages:     "chat_messages:" + chatHash,
+		redisStream:              "chat_stream:" + chatHash,
 		ctx:                      context.Background(),
 	}
 }
 
 func (c *ChatRepository) AddParticipant(userHash string) {
 
-	added, err := redis.Client.SAdd(c.ctx, c.redisListKeyParticipants, userHash).Result()
+	added, err := redisUtil.Client.SAdd(c.ctx, c.redisListKeyParticipants, userHash).Result()
 	if err != nil {
 		panic(err)
 	}
@@ -32,18 +37,8 @@ func (c *ChatRepository) AddParticipant(userHash string) {
 	}
 }
 
-func (c *ChatRepository) AddMessage(message string) {
-	err := redis.Client.RPush(c.ctx, c.redisListKeyMessages, message).Err()
-
-	if err != nil {
-		fmt.Println("Ошибка при добавлении элемента в messages", err)
-	}
-
-	fmt.Println("Элемент успешно добавлен в список messages")
-}
-
 func (c *ChatRepository) DeleteParticipants() {
-	err := redis.Client.Del(c.ctx, c.redisListKeyParticipants).Err()
+	err := redisUtil.Client.Del(c.ctx, c.redisListKeyParticipants).Err()
 	if err != nil {
 		fmt.Println("Ошибка при удалении списка participants:", err)
 		return
@@ -51,20 +46,39 @@ func (c *ChatRepository) DeleteParticipants() {
 	fmt.Println("Список participants успешно удален")
 }
 
-func (c *ChatRepository) DeleteMessages() {
-	err := redis.Client.Del(c.ctx, c.redisListKeyMessages).Err()
-	if err != nil {
-		fmt.Println("Ошибка при удалении списка сообщений:", err)
-		return
-	}
-	fmt.Println("Список сообщений успешно удален")
+func (c *ChatRepository) RegisterUserToStream(userHash string) {
+	redisUtil.Client.XGroupCreateMkStream(c.ctx, c.redisStream, userHash, "0")
 }
 
-func (c *ChatRepository) GetMessages() []string {
-	result, err := redis.Client.LRange(c.ctx, c.redisListKeyMessages, 0, -1).Result()
-    if err != nil {
-        panic(err)
-    }
+func (c *ChatRepository) AddMessage(message messageModel.Message) {
+	data, err := json.Marshal(message)
+	if err != nil {
+		fmt.Println("AddMessage Redis Error encoding message to JSON: ", err)
+	}
 
-	return result
+	redisUtil.Client.XAdd(c.ctx, &redis.XAddArgs{
+		Stream: c.redisStream,
+		Values: map[string]interface{}{
+			"message": data,
+		},
+	})
+}
+
+func (c *ChatRepository) GetNewMessages(userHash string) []redis.XStream {
+	messages, err := redisUtil.Client.XReadGroup(c.ctx, &redis.XReadGroupArgs{
+		Group:    userHash,
+		Consumer: "consumer1",
+		Streams:  []string{c.redisStream, ">"},
+		Count:    10,
+	}).Result()
+
+	if err != nil {
+		fmt.Println("Error GetNewMessages:")
+	}
+
+	return messages
+}
+
+func (c *ChatRepository) PointMessageAsRead(userHash string, messageId string) {
+	redisUtil.Client.XAck(c.ctx, c.redisStream, userHash, messageId)
 }
