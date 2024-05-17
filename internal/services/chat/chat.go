@@ -45,61 +45,68 @@ func (c *ChatService) AddUserToQueue(user *userModel.User) {
 
 func (c *ChatService) Start() {
 	fmt.Println("chat is starting")
+	defer c.closeChat()
 
+	c.registerUsers()
+	c.notifyChatStart()
+	c.startHandlers()
+}
+
+func (c *ChatService) registerUsers() {
 	for _, user := range c.chat.Users {
-		c.NotifyChatStart(user)
 		c.chatRepository.RegisterUserToStream(user.Hash)
 	}
+}
 
+func (c *ChatService) startHandlers() {
 	for _, user := range c.chat.Users {
-		go c.write(user)
-		go c.read(user)
+		go c.readUserMessages(user)
+		go c.sendMessages(user)
 	}
 }
 
-func (c *ChatService) write(user *userModel.User) {
+func (c *ChatService) readUserMessages(user *userModel.User) {
 	for {
-		_, textMessage, err := user.Conn.ReadMessage()
-		if err != nil {
-			log.Println("Error reading message from user connection 1:", err)
+		fmt.Println("READ MESSAGE FOR ", user.Hash)
+		fmt.Println("READ MESSAGE within chat ", c.chat.Hash)
 
-			// TODO notify other users
-			// c.closeUserConn(user2)
-			return
-		}
+		select {
+		case message, ok := <-user.ChannelChat:
+			if !ok {
+				fmt.Printf("readUserMessages Channel closed for user %s\n", user.Hash)
+				return
+			}
 
-		var message messageModel.Message
-		json.Unmarshal(textMessage, &message)
-
-		switch message.Category {
-		case "CHAT":
-			message.Category = "CHAT"
-			message.Payload.Timestamp = time.Now().Format("2006-01-02 15:04:05")
-			message.Payload.UserHash = user.Hash
-			message.Payload.ChatHash = c.chat.Hash
-
-			c.chatRepository.AddMessage(message)
-		case "FRONT:CHAT_EXIT":
-			fmt.Println("FRONT:CHAT_EXIT HandleStreamMessages ", time.Now().Format("2006-01-02 15:04:05"))
-			message.Category = "CHAT_EXIT"
-			message.Payload.Timestamp = time.Now().Format("2006-01-02 15:04:05")
-			message.Payload.UserHash = ""
-			message.Payload.ChatHash = ""
-
-			//TODO handler this case within the redis stream 
-		case "FRONT:START_QUEUE":
-			fmt.Println("FRONT:START_QUEUE HandleStreamMessages ", time.Now().Format("2006-01-02 15:04:05"))
-
-			c.AddUserToQueue(user)
-
-			return
+			message = c.handleMessage(user, message)
+			c.chatRepository.AddMessage(*message)
+		case <-time.After(5 * time.Second):
+			fmt.Printf("Timeout reading message for user %s\n", user.Hash)
 		}
 	}
 }
 
-func (c *ChatService) read(user *userModel.User) {
+func (c *ChatService) handleMessage(user *userModel.User, message *messageModel.Message) *messageModel.Message {
+	switch message.Category {
+	case "CHAT":
+		message.Payload.UserHash = user.Hash
+		message.Payload.ChatHash = c.chat.Hash
+		message.Payload.Timestamp = time.Now().Format("2006-01-02 15:04:05")
+
+	case "FRONT:CHAT_EXIT":
+		message.Category = "CHAT_EXIT"
+		message.Payload.UserHash = user.Hash
+		message.Payload.ChatHash = c.chat.Hash
+		message.Payload.Timestamp = time.Now().Format("2006-01-02 15:04:05")
+	}
+
+	return message
+}
+
+func (c *ChatService) sendMessages(user *userModel.User) {
 	for {
 		streams := c.chatRepository.GetNewMessages(user.Hash)
+		fmt.Println("SEND MESSAGE FOR ", user.Hash)
+		fmt.Println("SEND MESSAGE within chat ", c.chat.Hash)
 
 		for _, stream := range streams {
 			for _, message := range stream.Messages {
@@ -108,6 +115,7 @@ func (c *ChatService) read(user *userModel.User) {
 				var message messageModel.Message
 				json.Unmarshal([]byte(messageData), &message)
 
+				fmt.Println("sendMessages user: ", user.Hash)
 				fmt.Println("Received message data:", messageData)
 
 				if user.Hash == message.Payload.UserHash {
@@ -115,12 +123,16 @@ func (c *ChatService) read(user *userModel.User) {
 				}
 
 				c.SendMessage(user.Conn, &message)
+
+				if message.Category == "CHAT_EXIT" {
+					close(user.ChannelChat)
+				}
 			}
 		}
 	}
 }
 
-func (c *ChatService) NotifyChatStart(user *userModel.User) {
+func (c *ChatService) notifyChatStart() {
 	message := messageModel.NewMessage(
 		"CHAT_START",
 		c.chat.Hash,
@@ -129,10 +141,7 @@ func (c *ChatService) NotifyChatStart(user *userModel.User) {
 		"",
 	)
 
-	if err := c.SendMessage(user.Conn, message); err != nil {
-		log.Println("Error sending message to client 2: ", err)
-		return
-	}
+	c.chatRepository.AddMessage(*message)
 }
 
 func (c *ChatService) SendMessage(conn *websocket.Conn, message *messageModel.Message) error {
@@ -144,18 +153,6 @@ func (c *ChatService) SendMessage(conn *websocket.Conn, message *messageModel.Me
 	return conn.WriteMessage(websocket.TextMessage, data)
 }
 
-func (c *ChatService) closeUserConn(user *userModel.User) {
-	message := messageModel.NewMessage(
-		"CLOSE",
-		string("Собеседнкик покинул чат"),
-		time.Now().Format("2000-01-01 00:00:00"),
-		"",
-		"",
-	)
-
-	if err := c.SendMessage(user.Conn, message); err != nil {
-		log.Println("Error sending message to client 2: ", err)
-	}
-
-	user.Conn.Close()
+func (c *ChatService) closeChat() {
+	fmt.Println("Close chat")
 }

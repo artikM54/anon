@@ -1,7 +1,6 @@
 package main_routes
 
 import (
-	"anonymous_chat/internal/handler_queue"
 	messageModel "anonymous_chat/internal/models/message"
 	userModel "anonymous_chat/internal/models/user"
 	userService "anonymous_chat/internal/services/user"
@@ -40,26 +39,12 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go handleConn(conn)
+	fmt.Println("ws handler end", time.Now().Format("2006-01-02 15:04:05"))
 }
 
 func handleConn(conn *websocket.Conn) {
-	fmt.Println("HANDLER COMMANDS ", time.Now().Format("2006-01-02 15:04:05"))
-	message := messageModel.NewMessage(
-		"CONNECT",
-		"SUCCESS",
-		time.Now().Format("2006-01-02 15:04:05"),
-		"",
-		"",
-	)
-
-	if err := sender.SendMessage(conn, message); err != nil {
-		log.Println("Error sending message to client 2: ", err)
-		return
-	}
-
-	var wasCommand bool
-	var token = message.Payload.UserHash
-	var user *userModel.User
+	fmt.Println("handler conn start", time.Now().Format("2006-01-02 15:04:05"))
+	sender.NotifyConnect(conn)
 
 	for {
 		_, data, err := conn.ReadMessage()
@@ -75,41 +60,27 @@ func handleConn(conn *websocket.Conn) {
 			log.Println("Error reading message from client 1:", err)
 		}
 
-		fmt.Println(message)
-
+		fmt.Println("handler conn message", message)
 		switch message.Category {
 		case "FRONT:GET_TOKEN":
-			if wasCommand {
-				continue
-			}
-
-			fmt.Println("FRONT:GET_TOKEN")
-			token = hashUtil.CreateUniqueModelHash(userModel.RedisList)
+			token := hashUtil.CreateUniqueModelHash(userModel.RedisList)
 			sender.NotifyToken(conn, token)
 
-			wasCommand = true
+			user := userService.NewUser(conn, token)
+			userService := userService.NewUserService(user)
+			go userService.HandleUsersCommand()
+
+			return
 		case "FRONT:GIVE_TOKEN":
-			if wasCommand {
-				continue
-			}
+			token := message.Payload.Text
 
-			fmt.Println("FRONT:GIVE_TOKEN")
-			token = message.Payload.Text
-
-			wasCommand = true
-		case "FRONT:START_QUEUE":
-			if token == "" {
-				continue
-			}
-
-			fmt.Println("FRONT:START_QUEUE ", time.Now().Format("2006-01-02 15:04:05"))
-
-			user = userService.NewUser(conn, token)
-			handler_queue.AddUserToQueue(user)
+			user := userService.NewUser(conn, token)
+			userService := userService.NewUserService(user)
+			go userService.HandleUsersCommand()
 
 			return
 		default:
-			fmt.Println("Undefined command")
+			fmt.Println("Undefined command 1")
 		}
 
 	}

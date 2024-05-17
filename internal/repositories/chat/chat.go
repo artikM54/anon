@@ -67,7 +67,7 @@ func (c *ChatRepository) AddMessage(message messageModel.Message) {
 func (c *ChatRepository) GetNewMessages(userHash string) []redis.XStream {
 	messages, err := redisUtil.Client.XReadGroup(c.ctx, &redis.XReadGroupArgs{
 		Group:    userHash,
-		Consumer: "consumer1",
+		Consumer: "user",
 		Streams:  []string{c.redisStream, ">"},
 		Count:    10,
 	}).Result()
