@@ -18,10 +18,13 @@ func SendMessage(conn *websocket.Conn, message *messageModel.Message) error {
 }
 
 func NotifyConnect(conn *websocket.Conn) {
+	now := time.Now()
+	unixTimestamp := now.Unix()
+
 	message := messageModel.NewMessage(
 		"CONNECT",
 		"SUCCESS",
-		time.Now().Format("2006-01-02 15:04:05"),
+		unixTimestamp,
 		"",
 		"",
 	)
@@ -33,10 +36,13 @@ func NotifyConnect(conn *websocket.Conn) {
 }
 
 func NotifyToken(conn *websocket.Conn, token string) {
+	now := time.Now()
+	unixTimestamp := now.Unix()
+
 	message := messageModel.NewMessage(
 		"TOKEN",
 		token,
-		time.Now().Format("2006-01-02 15:04:05"),
+		unixTimestamp,
 		"",
 		"",
 	)

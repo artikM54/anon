@@ -88,15 +88,20 @@ func (c *ChatService) readUserMessages(user *userModel.User) {
 func (c *ChatService) handleMessage(user *userModel.User, message *messageModel.Message) *messageModel.Message {
 	switch message.Category {
 	case "CHAT":
+		now := time.Now()
+		unixTimestamp := now.Unix()
 		message.Payload.UserHash = user.Hash
 		message.Payload.ChatHash = c.chat.Hash
-		message.Payload.Timestamp = time.Now().Format("2006-01-02 15:04:05")
+		message.Payload.Timestamp = unixTimestamp
 
 	case "FRONT:CHAT_EXIT":
+		now := time.Now()
+		unixTimestamp := now.Unix()
+
 		message.Category = "CHAT_EXIT"
 		message.Payload.UserHash = user.Hash
 		message.Payload.ChatHash = c.chat.Hash
-		message.Payload.Timestamp = time.Now().Format("2006-01-02 15:04:05")
+		message.Payload.Timestamp = unixTimestamp
 	}
 
 	return message
@@ -133,10 +138,13 @@ func (c *ChatService) sendMessages(user *userModel.User) {
 }
 
 func (c *ChatService) notifyChatStart() {
+	now := time.Now()
+	unixTimestamp := now.Unix()
+
 	message := messageModel.NewMessage(
 		"CHAT_START",
 		c.chat.Hash,
-		time.Now().Format("2006-01-02 15:04:05"),
+		unixTimestamp,
 		"",
 		"",
 	)

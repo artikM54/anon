@@ -2,7 +2,7 @@ package message
 
 type MessagePayload struct {
 	Text      string `json:"text"`
-	Timestamp string `json:"timestamp"`
+	Timestamp int64 `json:"timestamp"`
 	UserHash  string `json:"userHash"`
 	ChatHash  string `json:"chatHash"`
 }
@@ -11,7 +11,7 @@ type Message struct {
 	Payload  *MessagePayload `json:"payload"`
 }
 
-func NewMessage(category string, text string, timestamp string, userHash string, chatHash string) *Message {
+func NewMessage(category string, text string, timestamp int64, userHash string, chatHash string) *Message {
 	payload := &MessagePayload{
 		Text:      text,
 		Timestamp: timestamp,
