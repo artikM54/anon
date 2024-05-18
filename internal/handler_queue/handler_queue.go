@@ -30,12 +30,12 @@ func AddUserToQueue(user *userModel.User) {
 	userQueue[user.Hash] = user
 }
 
-func ExitUserWithinQueue(user *userModel.User) bool {
-	_, found := userQueue[user.Hash]
+func ExitUserWithinQueue(userHash string) bool {
+	_, found := userQueue[userHash]
 
 	return found
 }
-	
+
 func DeleteUserFromQueue(userHash string) {
 	delete(userQueue, userHash)
 }
