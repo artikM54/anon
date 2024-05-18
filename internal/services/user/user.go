@@ -55,8 +55,11 @@ func (c *UserService) HandleUsersCommand() {
 		switch message.Category {
 		case "FRONT:START_QUEUE":
 			fmt.Printf("HANDLE COMMANDS FRONT:START_QUEUE for user %s\n", c.user.Hash)
-			c.user.ChannelChat = make(chan *messageModel.Message, 30)
-			handler_queue.AddUserToQueue(c.user)
+
+			if !handler_queue.ExitUserWithinQueue(c.user.Hash) {
+				c.user.ChannelChat = make(chan *messageModel.Message, 30)
+				handler_queue.AddUserToQueue(c.user)
+			}
 		case "FRONT:EXIT_QUEUE":
 			fmt.Printf("HANDLE COMMANDS FRONT:EXIT_QUEUE for user %s\n", c.user.Hash)
 			handler_queue.DeleteUserFromQueue(c.user.Hash)
