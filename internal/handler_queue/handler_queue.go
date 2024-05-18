@@ -4,11 +4,11 @@ import (
 	userModel "anonymous_chat/internal/models/user"
 	chatService "anonymous_chat/internal/services/chat"
 	"fmt"
-	"log"
 	"math/rand"
+	"time"
 )
 
-var userQueue []*userModel.User
+var userQueue = make(map[string]*userModel.User)
 
 func MustLoad() {
 	go start()
@@ -27,20 +27,26 @@ func getCountUsersIntoQueue() int {
 }
 
 func AddUserToQueue(user *userModel.User) {
-	userQueue = append(userQueue, user)
+	userQueue[user.Hash] = user
+}
+
+func ExitUserWithinQueue(user *userModel.User) bool {
+	_, found := userQueue[user.Hash]
+
+	return found
+}
+	
+func DeleteUserFromQueue(userHash string) {
+	delete(userQueue, userHash)
 }
 
 func bindUser() {
 	fmt.Println("There are two users")
 
-	users, err := chooseRandomUsers()
-	if err != nil {
-		log.Println("Error choosing random pair:", err)
-		return
-	}
+	users := chooseRandomUsers(userQueue, 2)
 
 	for _, user := range users {
-		userQueue = removeClientFromSlice(userQueue, user)
+		DeleteUserFromQueue(user.Hash)
 	}
 
 	c := chatService.NewChatService(users, &userQueue)
@@ -48,27 +54,21 @@ func bindUser() {
 	go c.Start()
 }
 
-func chooseRandomUsers() ([]*userModel.User, error) {
-	result := make([]*userModel.User, 0, 5)
+func chooseRandomUsers(m map[string]*userModel.User, n int) []*userModel.User {
+	rand.Seed(time.Now().UnixNano())
 
-	idx1 := rand.Intn(len(userQueue))
-	idx2 := rand.Intn(len(userQueue))
-
-	for idx2 == idx1 {
-		idx2 = rand.Intn(len(userQueue))
-	}
-	result = append(result, userQueue[idx1])
-	result = append(result, userQueue[idx2])
-
-	return result, nil
-}
-
-func removeClientFromSlice(slice []*userModel.User, user *userModel.User) []*userModel.User {
-	for i, c := range slice {
-		if c == user {
-			return append(slice[:i], slice[i+1:]...)
-		}
+	values := make([]*userModel.User, 0, len(m))
+	for _, value := range m {
+		values = append(values, value)
 	}
 
-	return slice
+	rand.Shuffle(len(values), func(i, j int) { values[i], values[j] = values[j], values[i] })
+
+	if n > len(values) {
+		n = len(values)
+	}
+
+	result := values[:n]
+
+	return result
 }
