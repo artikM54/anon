@@ -18,10 +18,10 @@ import (
 type ChatService struct {
 	chat           *chatModel.Chat
 	chatRepository *chatRepository.ChatRepository
-	queue          *[]*userModel.User
+	queue          *map[string]*userModel.User
 }
 
-func NewChatService(users []*userModel.User, queue *[]*userModel.User) *ChatService {
+func NewChatService(users []*userModel.User, queue *map[string]*userModel.User) *ChatService {
 	chat := newChat(users)
 
 	return &ChatService{
@@ -39,7 +39,9 @@ func newChat(users []*userModel.User) *chatModel.Chat {
 }
 
 func (c *ChatService) AddUserToQueue(user *userModel.User) {
-	slice := append(*c.queue, user)
+	slice := *c.queue
+	slice[user.Hash] = user
+	
 	*c.queue = slice
 }
 
