@@ -66,17 +66,17 @@ func handleConn(conn *websocket.Conn) {
 			token := hashUtil.CreateUniqueModelHash(userModel.RedisList)
 			sender.NotifyToken(conn, token)
 
-			user := userService.NewUser(conn, token)
+			user := userModel.NewUser(conn, token)
 			userService := userService.NewUserService(user)
-			go userService.HandleUsersCommand()
+			go userService.Start()
 
 			return
 		case "FRONT:GIVE_TOKEN":
 			token := message.Payload.Text
 
-			user := userService.NewUser(conn, token)
+			user := userModel.NewUser(conn, token)
 			userService := userService.NewUserService(user)
-			go userService.HandleUsersCommand()
+			userService.Start()
 
 			return
 		default:
