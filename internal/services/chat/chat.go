@@ -16,7 +16,7 @@ import (
 )
 
 type ChatService struct {
-	chat           *chatModel.Chat
+	Chat           *chatModel.Chat
 	chatRepository *chatRepository.ChatRepository
 	queue          *map[string]*userModel.User
 }
@@ -25,7 +25,7 @@ func NewChatService(users []*userModel.User, queue *map[string]*userModel.User) 
 	chat := newChat(users)
 
 	return &ChatService{
-		chat:           chat,
+		Chat:           chat,
 		chatRepository: chatRepository.NewChatRepository(chat.Hash),
 		queue:          queue,
 	}
@@ -41,7 +41,7 @@ func newChat(users []*userModel.User) *chatModel.Chat {
 func (c *ChatService) AddUserToQueue(user *userModel.User) {
 	slice := *c.queue
 	slice[user.Hash] = user
-	
+
 	*c.queue = slice
 }
 
@@ -55,13 +55,14 @@ func (c *ChatService) Start() {
 }
 
 func (c *ChatService) registerUsers() {
-	for _, user := range c.chat.Users {
+	for _, user := range c.Chat.Users {
 		c.chatRepository.RegisterUserToStream(user.Hash)
+		user.AddChat(c.Chat.Hash)
 	}
 }
 
 func (c *ChatService) startHandlers() {
-	for _, user := range c.chat.Users {
+	for _, user := range c.Chat.Users {
 		go c.readUserMessages(user)
 		go c.sendMessages(user)
 	}
@@ -69,70 +70,50 @@ func (c *ChatService) startHandlers() {
 
 func (c *ChatService) readUserMessages(user *userModel.User) {
 	for {
-		fmt.Println("READ MESSAGE FOR ", user.Hash)
-		fmt.Println("READ MESSAGE within chat ", c.chat.Hash)
+		fmt.Println("READ MESSAGE FOR ", user.Hash, "chat: ", c.Chat.Hash)
 
-		select {
-		case message, ok := <-user.ChannelChat:
-			if !ok {
-				fmt.Printf("readUserMessages Channel closed for user %s\n", user.Hash)
-				return
-			}
-
-			message = c.handleMessage(user, message)
-			c.chatRepository.AddMessage(*message)
-		case <-time.After(5 * time.Second):
-			fmt.Printf("Timeout reading message for user %s\n", user.Hash)
+		message, opened := user.GetFromInChat(c.Chat.Hash)
+		if !opened {
+			fmt.Printf("readUserMessages Channel closed for user %s\n", user.Hash)
+			return
 		}
+
+		message.Payload.ChatHash = c.Chat.Hash
+		c.chatRepository.AddMessage(*message)
 	}
-}
-
-func (c *ChatService) handleMessage(user *userModel.User, message *messageModel.Message) *messageModel.Message {
-	switch message.Category {
-	case "CHAT":
-		now := time.Now()
-		unixTimestamp := now.Unix()
-		message.Payload.UserHash = user.Hash
-		message.Payload.ChatHash = c.chat.Hash
-		message.Payload.Timestamp = unixTimestamp
-
-	case "FRONT:CHAT_EXIT":
-		now := time.Now()
-		unixTimestamp := now.Unix()
-
-		message.Category = "CHAT_EXIT"
-		message.Payload.UserHash = user.Hash
-		message.Payload.ChatHash = c.chat.Hash
-		message.Payload.Timestamp = unixTimestamp
-	}
-
-	return message
 }
 
 func (c *ChatService) sendMessages(user *userModel.User) {
 	for {
-		streams := c.chatRepository.GetNewMessages(user.Hash)
-		fmt.Println("SEND MESSAGE FOR ", user.Hash)
-		fmt.Println("SEND MESSAGE within chat ", c.chat.Hash)
+		chanUser := user.GetChatState(c.Chat.Hash)
 
-		for _, stream := range streams {
-			for _, message := range stream.Messages {
-				messageData := message.Values["message"].(string)
+		select {
+		case <-chanUser:
+			fmt.Println("Received done signal, exiting goroutine")
+			return
+		default:
+			streams := c.chatRepository.GetNewMessages(user.Hash)
+			fmt.Println("SEND MESSAGE FOR ", user.Hash, " CHAT ", c.Chat.Hash)
 
-				var message messageModel.Message
-				json.Unmarshal([]byte(messageData), &message)
+			for _, stream := range streams {
+				for _, message := range stream.Messages {
+					messageData := message.Values["message"].(string)
 
-				fmt.Println("sendMessages user: ", user.Hash)
-				fmt.Println("Received message data:", messageData)
+					var message messageModel.Message
+					json.Unmarshal([]byte(messageData), &message)
 
-				if user.Hash == message.Payload.UserHash {
-					continue
-				}
+					fmt.Println("Read message from redis for: ", user.Hash, "message data : ", messageData)
 
-				c.SendMessage(user.Conn, &message)
+					if user.Hash == message.Payload.UserHash {
+						fmt.Println("CONTINUE for: ", user.Hash)
+						continue
+					}
 
-				if message.Category == "CHAT_EXIT" {
-					close(user.ChannelChat)
+					user.PutToOutChannel(&message)
+
+					if message.Category == "CHAT_EXIT" {
+						user.CloseChat(message.Payload.ChatHash)
+					}
 				}
 			}
 		}
@@ -145,7 +126,7 @@ func (c *ChatService) notifyChatStart() {
 
 	message := messageModel.NewMessage(
 		"CHAT_START",
-		c.chat.Hash,
+		c.Chat.Hash,
 		unixTimestamp,
 		"",
 		"",
