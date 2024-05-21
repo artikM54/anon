@@ -1,8 +1,21 @@
 package message
 
+const (
+	ConnectCategory         = "CONNECT"
+	TokenCategory           = "TOKEN"
+	StartCategory           = "CHAT_START"
+	ChatCategory            = "CHAT"
+	ExitCategory            = "CHAT_EXIT"
+	FrontStartQueueCategory = "FRONT:START_QUEUE"
+	FrontExitQueueCategory  = "FRONT:EXIT_QUEUE"
+	FrontChatExitCategory   = "FRONT:CHAT_EXIT"
+	FrontGetTokenCategory   = "FRONT:GET_TOKEN"
+	FrontGiveTokenCategory  = "FRONT:GIVE_TOKEN"
+)
+
 type MessagePayload struct {
 	Text      string `json:"text"`
-	Timestamp int64 `json:"timestamp"`
+	Timestamp int64  `json:"timestamp"`
 	UserHash  string `json:"userHash"`
 	ChatHash  string `json:"chatHash"`
 }

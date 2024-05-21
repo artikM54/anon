@@ -51,27 +51,28 @@ func (u *UserService) listeningMessages() {
 		message.Payload.Timestamp = unixTimestamp
 		message.Payload.UserHash = u.user.Hash
 		fmt.Println("HANDLER user messages message chat Hash: ", message.Payload.ChatHash)
+
 		switch message.Category {
-		case "FRONT:START_QUEUE":
+		case messageModel.FrontStartQueueCategory:
 			fmt.Printf("HANDLE COMMANDS FRONT:START_QUEUE for user %s\n", u.user.Hash)
 
 			if !handler_queue.ExitUserWithinQueue(u.user.Hash) {
 				handler_queue.AddUserToQueue(u.user)
 			}
-		case "FRONT:EXIT_QUEUE":
+		case messageModel.FrontExitQueueCategory:
 			fmt.Printf("HANDLE COMMANDS FRONT:EXIT_QUEUE for user %s\n", u.user.Hash)
 			handler_queue.DeleteUserFromQueue(u.user.Hash)
-		case "CHAT":
+		case messageModel.ChatCategory:
 			fmt.Printf("HANDLE COMMANDS CHAT for user %s\n", u.user.Hash)
 
 			if message.Payload.ChatHash != "" {
 				u.user.PutToInChat(&message)
 			}
-		case "FRONT:CHAT_EXIT":
+		case messageModel.FrontChatExitCategory:
 			fmt.Printf("HANDLE COMMANDS FRONT:CHAT_EXIT for user %s\n", u.user.Hash)
 
 			if message.Payload.ChatHash != "" {
-				message.Category = "CHAT_EXIT"
+				message.Category = messageModel.ExitCategory
 				u.user.PutToInChat(&message)
 				u.user.CloseChat(message.Payload.ChatHash)
 			}

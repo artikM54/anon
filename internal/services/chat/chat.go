@@ -111,7 +111,7 @@ func (c *ChatService) sendMessages(user *userModel.User) {
 
 					user.PutToOutChannel(&message)
 
-					if message.Category == "CHAT_EXIT" {
+					if message.Category == messageModel.ExitCategory {
 						user.CloseChat(message.Payload.ChatHash)
 					}
 				}
@@ -125,7 +125,7 @@ func (c *ChatService) notifyChatStart() {
 	unixTimestamp := now.Unix()
 
 	message := messageModel.NewMessage(
-		"CHAT_START",
+		messageModel.StartCategory,
 		c.Chat.Hash,
 		unixTimestamp,
 		"",

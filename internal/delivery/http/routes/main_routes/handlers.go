@@ -62,7 +62,7 @@ func handleConn(conn *websocket.Conn) {
 
 		fmt.Println("handler conn message", message)
 		switch message.Category {
-		case "FRONT:GET_TOKEN":
+		case messageModel.FrontGetTokenCategory:
 			token := hashUtil.CreateUniqueModelHash(userModel.RedisList)
 			sender.NotifyToken(conn, token)
 
@@ -71,7 +71,7 @@ func handleConn(conn *websocket.Conn) {
 			go userService.Start()
 
 			return
-		case "FRONT:GIVE_TOKEN":
+		case messageModel.FrontGiveTokenCategory:
 			token := message.Payload.Text
 
 			user := userModel.NewUser(conn, token)

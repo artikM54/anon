@@ -22,7 +22,7 @@ func NotifyConnect(conn *websocket.Conn) {
 	unixTimestamp := now.Unix()
 
 	message := messageModel.NewMessage(
-		"CONNECT",
+		messageModel.ConnectCategory,
 		"SUCCESS",
 		unixTimestamp,
 		"",
@@ -40,7 +40,7 @@ func NotifyToken(conn *websocket.Conn, token string) {
 	unixTimestamp := now.Unix()
 
 	message := messageModel.NewMessage(
-		"TOKEN",
+		messageModel.TokenCategory,
 		token,
 		unixTimestamp,
 		"",
