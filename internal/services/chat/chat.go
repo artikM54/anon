@@ -129,7 +129,7 @@ func (c *ChatService) notifyChatStart() {
 		c.Chat.Hash,
 		unixTimestamp,
 		"",
-		"",
+		c.Chat.Hash,
 	)
 
 	c.chatRepository.AddMessage(*message)
