@@ -1,12 +1,8 @@
 package main_routes
 
 import (
-	messageModel "anonymous_chat/internal/models/message"
-	userModel "anonymous_chat/internal/models/user"
-	userService "anonymous_chat/internal/services/user"
-	hashUtil "anonymous_chat/internal/utils/hash"
-	"anonymous_chat/internal/utils/sender"
-	"encoding/json"
+	userConnectionService "anonymous_chat/internal/services/user/userConnection"
+
 	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
@@ -26,7 +22,7 @@ var (
 )
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Тест"))
+	w.Write([]byte("ANON"))
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
@@ -38,50 +34,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go handleConn(conn)
-	fmt.Println("ws handler end", time.Now().Format("2006-01-02 15:04:05"))
-}
-
-func handleConn(conn *websocket.Conn) {
-	fmt.Println("handler conn start", time.Now().Format("2006-01-02 15:04:05"))
-	sender.NotifyConnect(conn)
-
-	for {
-		_, data, err := conn.ReadMessage()
-		if err != nil {
-			log.Println("Error reading:", err)
-			return
-		}
-
-		var message messageModel.Message
-
-		err = json.Unmarshal(data, &message)
-		if err != nil {
-			log.Println("Error reading message from client 1:", err)
-		}
-
-		fmt.Println("handler conn message", message)
-		switch message.Category {
-		case "FRONT:GET_TOKEN":
-			token := hashUtil.CreateUniqueModelHash(userModel.RedisList)
-			sender.NotifyToken(conn, token)
-
-			user := userModel.NewUser(conn, token)
-			userService := userService.NewUserService(user)
-			go userService.Start()
-
-			return
-		case "FRONT:GIVE_TOKEN":
-			token := message.Payload.Text
-
-			user := userModel.NewUser(conn, token)
-			userService := userService.NewUserService(user)
-			userService.Start()
-
-			return
-		default:
-			fmt.Println("Undefined command 1")
-		}
-
-	}
+	u := userConnectionService.NewUserConnectionService(conn)
+	u.Start()
 }

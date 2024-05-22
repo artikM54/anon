@@ -2,9 +2,6 @@ package user
 
 import (
 	messageModel "anonymous_chat/internal/models/message"
-	hashUtil "anonymous_chat/internal/utils/hash"
-	"github.com/gorilla/websocket"
-	"sync"
 )
 
 const (
@@ -18,30 +15,19 @@ type UserChat struct {
 
 type User struct {
 	Hash       string
-	Conn       *websocket.Conn
 	outChannel chan *messageModel.Message
 	chats      map[string]*UserChat
-	mutex      sync.Mutex
 }
 
-func NewUser(conn *websocket.Conn, hash string) *User {
-	if hash == "" {
-		hash = hashUtil.CreateUniqueModelHash(RedisList)
-	}
-
+func NewUser() *User {
 	return &User{
-		Hash:       hash,
-		Conn:       conn,
 		outChannel: make(chan *messageModel.Message),
 		chats:      make(map[string]*UserChat),
 	}
 }
 
-func (u *User) ReadMessage() ([]byte, error) {
-	u.mutex.Lock()
-	defer u.mutex.Unlock()
-	_, data, err := u.Conn.ReadMessage()
-	return data, err
+func (u *User) SetToken(hash string) {
+	u.Hash = hash
 }
 
 func (u *User) PutToOutChannel(message *messageModel.Message) {
@@ -82,4 +68,10 @@ func (u *User) GetFromInChat(hash string) (*messageModel.Message, bool) {
 func (u *User) CloseChat(hash string) {
 	close(u.chats[hash].in)
 	close(u.chats[hash].stop)
+}
+
+func (u *User) ExitChat(hash string) bool {
+	_, found := u.chats[hash]
+
+	return found
 }
