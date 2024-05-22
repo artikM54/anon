@@ -1,5 +1,9 @@
 package message
 
+import (
+	"time"
+)
+
 const (
 	ConnectCategory         = "CONNECT"
 	TokenCategory           = "TOKEN"
@@ -24,10 +28,13 @@ type Message struct {
 	Payload  *MessagePayload `json:"payload"`
 }
 
-func NewMessage(category string, text string, timestamp int64, userHash string, chatHash string) *Message {
+func NewMessage(category string, text string, userHash string, chatHash string) *Message {
+	now := time.Now()
+	unixTimestamp := now.Unix()
+
 	payload := &MessagePayload{
 		Text:      text,
-		Timestamp: timestamp,
+		Timestamp: unixTimestamp,
 		UserHash:  userHash,
 		ChatHash:  chatHash,
 	}

@@ -8,10 +8,6 @@ import (
 	hashUtil "anonymous_chat/internal/utils/hash"
 	"encoding/json"
 	"fmt"
-
-	"log"
-	"time"
-
 	"github.com/gorilla/websocket"
 )
 
@@ -121,13 +117,9 @@ func (c *ChatService) sendMessages(user *userModel.User) {
 }
 
 func (c *ChatService) notifyChatStart() {
-	now := time.Now()
-	unixTimestamp := now.Unix()
-
 	message := messageModel.NewMessage(
 		messageModel.StartCategory,
 		c.Chat.Hash,
-		unixTimestamp,
 		"",
 		c.Chat.Hash,
 	)
@@ -138,7 +130,7 @@ func (c *ChatService) notifyChatStart() {
 func (c *ChatService) SendMessage(conn *websocket.Conn, message *messageModel.Message) error {
 	data, err := json.Marshal(message)
 	if err != nil {
-		log.Println("Error encoding message to JSON: ", err)
+		fmt.Println("Error encoding message to JSON: ", err)
 	}
 
 	return conn.WriteMessage(websocket.TextMessage, data)
