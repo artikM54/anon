@@ -8,7 +8,7 @@ import (
 	hashUtil "anonymous_chat/internal/utils/hash"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
+	"time"
 )
 
 type ChatService struct {
@@ -59,16 +59,16 @@ func (c *ChatService) registerUsers() {
 
 func (c *ChatService) startHandlers() {
 	for _, user := range c.Chat.Users {
-		go c.readUserMessages(user)
-		go c.sendMessages(user)
+		go c.listeningUser(user)
+		go c.listeningChat(user)
 	}
 }
 
-func (c *ChatService) readUserMessages(user *userModel.User) {
+func (c *ChatService) listeningUser(user *userModel.User) {
 	for {
 		fmt.Println("READ MESSAGE FOR ", user.Hash, "chat: ", c.Chat.Hash)
 
-		message, opened := user.GetFromInChat(c.Chat.Hash)
+		message, opened := user.GetFromChat(c.Chat.Hash)
 		if !opened {
 			fmt.Printf("readUserMessages Channel closed for user %s\n", user.Hash)
 			return
@@ -79,41 +79,53 @@ func (c *ChatService) readUserMessages(user *userModel.User) {
 	}
 }
 
-func (c *ChatService) sendMessages(user *userModel.User) {
+func (c *ChatService) listeningChat(user *userModel.User) {
 	for {
-		chanUser := user.GetChatState(c.Chat.Hash)
+		fmt.Println("listeningChat FOR ", user.Hash, "chat: ", c.Chat.Hash)
+
+		chatState, founded := user.GetChatState(c.Chat.Hash)
+		if !founded {
+			return
+		}
 
 		select {
-		case <-chanUser:
+		case <-chatState:
 			fmt.Println("Received done signal, exiting goroutine")
 			return
 		default:
-			streams := c.chatRepository.GetNewMessages(user.Hash)
-			fmt.Println("SEND MESSAGE FOR ", user.Hash, " CHAT ", c.Chat.Hash)
+			c.tryLoadMessages(user)
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+}
 
-			for _, stream := range streams {
-				for _, message := range stream.Messages {
-					messageData := message.Values["message"].(string)
+func (c *ChatService) tryLoadMessages(user *userModel.User) {
+	streams := c.chatRepository.GetNewMessages(user.Hash)
+	fmt.Println("SEND MESSAGE FOR ", user.Hash, " CHAT ", c.Chat.Hash)
 
-					var message messageModel.Message
-					json.Unmarshal([]byte(messageData), &message)
+	for _, stream := range streams {
+		for _, message := range stream.Messages {
 
-					fmt.Println("Read message from redis for: ", user.Hash, "message data : ", messageData)
+			messageData := message.Values["message"].(string)
 
-					if user.Hash == message.Payload.UserHash {
-						fmt.Println("CONTINUE for: ", user.Hash)
-						continue
-					}
+			var message messageModel.Message
+			json.Unmarshal([]byte(messageData), &message)
 
-					user.PutToOutChannel(&message)
+			fmt.Println("Read message from redis for: ", user.Hash, "message data : ", messageData)
 
-					if message.Category == messageModel.ExitCategory {
-						user.CloseChat(message.Payload.ChatHash)
-					}
-				}
+			if user.Hash == message.Payload.UserHash {
+				fmt.Println("CONTINUE for: ", user.Hash)
+				continue
+			}
+
+			user.PutIntoChannel(&message)
+
+			if message.Category == messageModel.ExitCategory {
+				user.CloseChat(message.Payload.ChatHash)
 			}
 		}
 	}
+
 }
 
 func (c *ChatService) notifyChatStart() {
@@ -125,15 +137,6 @@ func (c *ChatService) notifyChatStart() {
 	)
 
 	c.chatRepository.AddMessage(*message)
-}
-
-func (c *ChatService) SendMessage(conn *websocket.Conn, message *messageModel.Message) error {
-	data, err := json.Marshal(message)
-	if err != nil {
-		fmt.Println("Error encoding message to JSON: ", err)
-	}
-
-	return conn.WriteMessage(websocket.TextMessage, data)
 }
 
 func (c *ChatService) closeChat() {

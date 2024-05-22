@@ -48,7 +48,7 @@ func (u *userConnectionService) listening() {
 
 func (u *userConnectionService) sending() {
 	for {
-		message, opened := u.user.GetFromOutChannel()
+		message, opened := u.user.GetFromChannel()
 		if !opened {
 			fmt.Println("out channel is closed")
 			return
@@ -130,7 +130,7 @@ func (u *userConnectionService) handleCaseFrontGetTokenCategory() {
 		"",
 	)
 
-	u.user.PutToOutChannel(message)
+	u.user.PutIntoChannel(message)
 }
 
 func (u *userConnectionService) handleCaseFrontGiveTokenCategory(message *messageModel.Message) {
@@ -172,7 +172,7 @@ func (u *userConnectionService) handleCaseChatCategory(message *messageModel.Mes
 		return
 	}
 
-	u.user.PutToInChat(message)
+	u.user.PutIntoChat(message)
 }
 
 func (u *userConnectionService) handleCaseFrontChatExitCategory(message *messageModel.Message) {
@@ -190,6 +190,6 @@ func (u *userConnectionService) handleCaseFrontChatExitCategory(message *message
 
 	message.Category = messageModel.ExitCategory
 
-	u.user.PutToInChat(message)
+	u.user.PutIntoChat(message)
 	u.user.CloseChat(message.Payload.ChatHash)
 }
