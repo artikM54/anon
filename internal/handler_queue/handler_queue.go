@@ -1,14 +1,12 @@
 package handler_queue
 
 import (
-	userModel "anonymous_chat/internal/models/user"
+	queueModel "anonymous_chat/internal/models/queue"
 	chatService "anonymous_chat/internal/services/chat"
 	"fmt"
-	"math/rand"
-	"time"
 )
 
-var userQueue = make(map[string]*userModel.User)
+var Queue queueModel.UserQueue = queueModel.NewUserQueue()
 
 func MustLoad() {
 	go start()
@@ -16,59 +14,18 @@ func MustLoad() {
 
 func start() {
 	for {
-		if getCountUsersIntoQueue() >= 2 {
+		if Queue.GetCountUsersIntoQueue() >= 2 {
 			bindUser()
 		}
 	}
 }
 
-func getCountUsersIntoQueue() int {
-	return len(userQueue)
-}
-
-func AddUserToQueue(user *userModel.User) {
-	userQueue[user.Hash] = user
-}
-
-func ExitUserWithinQueue(userHash string) bool {
-	_, found := userQueue[userHash]
-
-	return found
-}
-
-func DeleteUserFromQueue(userHash string) {
-	delete(userQueue, userHash)
-}
-
 func bindUser() {
 	fmt.Println("There are two users")
 
-	users := chooseRandomUsers(userQueue, 2)
+	users := Queue.ChooseRandomUsers(2)
 
-	for _, user := range users {
-		DeleteUserFromQueue(user.Hash)
-	}
-
-	c := chatService.NewChatService(users, &userQueue)
+	c := chatService.NewChatService(users, &Queue)
 
 	go c.Start()
-}
-
-func chooseRandomUsers(m map[string]*userModel.User, n int) []*userModel.User {
-	rand.Seed(time.Now().UnixNano())
-
-	values := make([]*userModel.User, 0, len(m))
-	for _, value := range m {
-		values = append(values, value)
-	}
-
-	rand.Shuffle(len(values), func(i, j int) { values[i], values[j] = values[j], values[i] })
-
-	if n > len(values) {
-		n = len(values)
-	}
-
-	result := values[:n]
-
-	return result
 }

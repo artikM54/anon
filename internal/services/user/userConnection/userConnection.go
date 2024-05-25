@@ -140,23 +140,23 @@ func (u *userConnectionService) handleCaseFrontGiveTokenCategory(message *messag
 func (u *userConnectionService) handleCaseFrontStartQueueCategory() {
 	fmt.Printf("HANDLE COMMANDS FRONT:START_QUEUE for user %s\n", u.user.Hash)
 
-	if handler_queue.ExitUserWithinQueue(u.user.Hash) {
+	if handler_queue.Queue.ExitUserWithinQueue(u.user.Hash) {
 		fmt.Printf("HANDLE COMMANDS FRONT:START_QUEUE THERE IS USER IN QUEUE %s\n", u.user.Hash)
 		return
 	}
 
-	handler_queue.AddUserToQueue(u.user)
+	handler_queue.Queue.AddUserToQueue(u.user)
 }
 
 func (u *userConnectionService) handleCaseFrontExitQueueCategory() {
 	fmt.Printf("HANDLE COMMANDS FRONT:EXIT_QUEUE for user %s\n", u.user.Hash)
 
-	if !handler_queue.ExitUserWithinQueue(u.user.Hash) {
+	if !handler_queue.Queue.ExitUserWithinQueue(u.user.Hash) {
 		fmt.Printf("HANDLE COMMANDS FRONT:EXIT_QUEUE there is not in queue for user %s\n", u.user.Hash)
 		return
 	}
 
-	handler_queue.DeleteUserFromQueue(u.user.Hash)
+	handler_queue.Queue.DeleteUserFromQueue(u.user.Hash)
 }
 
 func (u *userConnectionService) handleCaseChatCategory(message *messageModel.Message) {
