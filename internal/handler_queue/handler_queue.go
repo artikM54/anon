@@ -23,9 +23,9 @@ func start() {
 func bindUser() {
 	fmt.Println("There are two users")
 
-	users := Queue.ChooseRandomUsers(2)
+	users := Queue.GetRandomUsers(2)
 
-	c := chatService.NewChatService(users, &Queue)
+	c := chatService.NewChatService(users)
 
 	go c.Start()
 }

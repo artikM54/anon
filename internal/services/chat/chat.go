@@ -4,7 +4,6 @@ import (
 	chatModel "anonymous_chat/internal/models/chat"
 	messageModel "anonymous_chat/internal/models/message"
 	userModel "anonymous_chat/internal/models/user"
-	queueModel "anonymous_chat/internal/models/queue"
 	chatRepository "anonymous_chat/internal/repositories/chat"
 	hashUtil "anonymous_chat/internal/utils/hash"
 	"encoding/json"
@@ -15,16 +14,14 @@ import (
 type ChatService struct {
 	Chat           *chatModel.Chat
 	chatRepository *chatRepository.ChatRepository
-	queue          *queueModel.UserQueue
 }
 
-func NewChatService(users []*userModel.User, queue *queueModel.UserQueue) *ChatService {
+func NewChatService(users []*userModel.User) *ChatService {
 	chat := newChat(users)
 
 	return &ChatService{
 		Chat:           chat,
 		chatRepository: chatRepository.NewChatRepository(chat.Hash),
-		queue:          queue,
 	}
 }
 
