@@ -34,8 +34,6 @@ func newChat(users []*userModel.User) *chatModel.Chat {
 
 func (c *ChatService) Start() {
 	fmt.Println("chat is starting")
-	defer c.closeChat()
-
 	c.registerUsers()
 	c.notifyChatStart()
 	c.startHandlers()
@@ -128,8 +126,4 @@ func (c *ChatService) notifyChatStart() {
 	)
 
 	c.chatRepository.AddMessage(*message)
-}
-
-func (c *ChatService) closeChat() {
-	fmt.Println("Close chat")
 }
