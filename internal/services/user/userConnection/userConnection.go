@@ -149,10 +149,10 @@ func (u *userConnectionService) handleCaseFrontStartQueueCategory() {
 }
 
 func (u *userConnectionService) handleCaseFrontExitQueueCategory() {
-	fmt.Printf("HANDLE COMMANDS FRONT:EXIT_QUEUE for user %s\n", u.user.Hash)
+	fmt.Printf("HANDLE COMMANDS FRONT:QUEUE_EXIT for user %s\n", u.user.Hash)
 
 	if !handler_queue.Queue.ExitUserWithinQueue(u.user.Hash) {
-		fmt.Printf("HANDLE COMMANDS FRONT:EXIT_QUEUE there is not in queue for user %s\n", u.user.Hash)
+		fmt.Printf("HANDLE COMMANDS FRONT:QUEUE_EXIT there is not in queue for user %s\n", u.user.Hash)
 		return
 	}
 

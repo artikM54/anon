@@ -46,7 +46,7 @@ func (q *UserQueue) DeleteUserFromQueue(userHash string) {
 	q.mu.Unlock()
 }
 
-func (q *UserQueue) ChooseRandomUsers(n int) []*userModel.User {
+func (q *UserQueue) GetRandomUsers(n int) []*userModel.User {
 	rand.Seed(time.Now().UnixNano())
 
 	values := make([]*userModel.User, 0, len(q.users))

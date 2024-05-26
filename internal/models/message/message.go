@@ -11,7 +11,7 @@ const (
 	ChatCategory            = "CHAT"
 	ExitCategory            = "CHAT_EXIT"
 	FrontStartQueueCategory = "FRONT:START_QUEUE"
-	FrontExitQueueCategory  = "FRONT:EXIT_QUEUE"
+	FrontExitQueueCategory  = "FRONT:QUEUE_EXIT"
 	FrontChatExitCategory   = "FRONT:CHAT_EXIT"
 	FrontGetTokenCategory   = "FRONT:GET_TOKEN"
 	FrontGiveTokenCategory  = "FRONT:GIVE_TOKEN"
