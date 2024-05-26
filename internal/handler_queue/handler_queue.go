@@ -27,5 +27,5 @@ func bindUser() {
 
 	c := chatService.NewChatService(users)
 
-	go c.Start()
+	c.Start()
 }
