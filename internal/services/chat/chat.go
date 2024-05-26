@@ -8,7 +8,6 @@ import (
 	hashUtil "anonymous_chat/internal/utils/hash"
 	"encoding/json"
 	"fmt"
-	"time"
 )
 
 type ChatService struct {
@@ -27,39 +26,31 @@ func NewChatService(users []*userModel.User) *ChatService {
 
 func newChat(users []*userModel.User) *chatModel.Chat {
 	return &chatModel.Chat{
-		Hash:  hashUtil.CreateUniqueModelHash(chatModel.RedisList),
-		Users: users,
+		Hash:    hashUtil.CreateUniqueModelHash(chatModel.RedisList),
+		Users:   users,
+		Channel: make(chan *messageModel.Message, 20),
 	}
 }
 
 func (c *ChatService) Start() {
 	fmt.Println("chat is starting")
-	c.registerUsers()
+
 	c.notifyChatStart()
 	c.startHandlers()
 }
 
-func (c *ChatService) registerUsers() {
-	for _, user := range c.Chat.Users {
-		c.chatRepository.RegisterUserToStream(user.Hash)
-		user.AddChat(c.Chat.Hash)
-	}
-}
-
 func (c *ChatService) startHandlers() {
-	for _, user := range c.Chat.Users {
-		go c.listeningUser(user)
-		go c.listeningChat(user)
-	}
+	go c.listening()
+	go c.sending()
 }
 
-func (c *ChatService) listeningUser(user *userModel.User) {
+func (c *ChatService) listening() {
 	for {
-		fmt.Println("READ MESSAGE FOR ", user.Hash, "chat: ", c.Chat.Hash)
+		fmt.Println("READ MESSAGE FOR chat: ", c.Chat.Hash)
 
-		message, opened := user.GetFromChat(c.Chat.Hash)
+		message, opened := <-c.Chat.Channel
 		if !opened {
-			fmt.Printf("readUserMessages Channel closed for user %s\n", user.Hash)
+			fmt.Printf("readUserMessages Channel closed for user %s\n", c.Chat.Hash)
 			return
 		}
 
@@ -68,53 +59,30 @@ func (c *ChatService) listeningUser(user *userModel.User) {
 	}
 }
 
-func (c *ChatService) listeningChat(user *userModel.User) {
+func (c *ChatService) sending() {
 	for {
-		fmt.Println("listeningChat FOR ", user.Hash, "chat: ", c.Chat.Hash)
+		messages := c.chatRepository.GetNewMessages()
+		fmt.Println("SEND MESSAGE FOR CHAT ", c.Chat.Hash)
 
-		chatState, founded := user.GetChatState(c.Chat.Hash)
-		if !founded {
-			return
-		}
-
-		select {
-		case <-chatState:
-			fmt.Println("Received done signal, exiting goroutine")
-			return
-		default:
-			c.tryLoadMessages(user)
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
-}
-
-func (c *ChatService) tryLoadMessages(user *userModel.User) {
-	streams := c.chatRepository.GetNewMessages(user.Hash)
-	fmt.Println("SEND MESSAGE FOR ", user.Hash, " CHAT ", c.Chat.Hash)
-
-	for _, stream := range streams {
-		for _, message := range stream.Messages {
+		for _, message := range messages {
 
 			messageData := message.Values["message"].(string)
 
 			var message messageModel.Message
 			json.Unmarshal([]byte(messageData), &message)
 
-			fmt.Println("Read message from redis for: ", user.Hash, "message data : ", messageData)
+			fmt.Println("Read message from redis message data : ", messageData)
 
-			if user.Hash == message.Payload.UserHash {
-				fmt.Println("CONTINUE for: ", user.Hash)
-				continue
-			}
+			for _, user := range c.Chat.Users {
+				if user.Hash == message.Payload.UserHash {
+					fmt.Println("CONTINUE for: ", user.Hash)
+					continue
+				}
 
-			user.PutIntoChannel(&message)
-
-			if message.Category == messageModel.ExitCategory {
-				user.CloseChat(message.Payload.ChatHash)
+				user.PutIntoChannel(&message)
 			}
 		}
 	}
-
 }
 
 func (c *ChatService) notifyChatStart() {

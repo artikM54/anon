@@ -167,12 +167,12 @@ func (u *userConnectionService) handleCaseChatCategory(message *messageModel.Mes
 		return
 	}
 
-	if !u.user.ExitChat(message.Payload.ChatHash) {
+	if !handler_queue.ExitChat(message.Payload.ChatHash) {
 		fmt.Printf("HANDLE COMMANDS CHAT HASH is not exist; user %s\n", u.user.Hash)
 		return
 	}
 
-	u.user.PutIntoChat(message)
+	handler_queue.PutIntoChat(message)
 }
 
 func (u *userConnectionService) handleCaseFrontChatExitCategory(message *messageModel.Message) {
@@ -183,13 +183,12 @@ func (u *userConnectionService) handleCaseFrontChatExitCategory(message *message
 		return
 	}
 
-	if !u.user.ExitChat(message.Payload.ChatHash) {
+	if !handler_queue.ExitChat(message.Payload.ChatHash) {
 		fmt.Printf("HANDLE COMMANDS FRONT:CHAT_EXIT HASH is not exist; user %s\n", u.user.Hash)
 		return
 	}
 
 	message.Category = messageModel.ExitCategory
 
-	u.user.PutIntoChat(message)
-	u.user.CloseChat(message.Payload.ChatHash)
+	handler_queue.PutIntoChat(message)
 }
