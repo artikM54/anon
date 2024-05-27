@@ -47,3 +47,12 @@ func ExitChat(hash string) bool {
 func PutIntoChat(message *messageModel.Message) {
 	Chats[message.Payload.ChatHash].Channel <- message
 }
+
+func ExitUserFromChat(message *messageModel.Message) {
+	chat := Chats[message.Payload.ChatHash]
+	userHash := message.Payload.UserHash
+
+	if chat.ExitUser(userHash) {
+		delete(chat.Users, userHash)
+	}
+}

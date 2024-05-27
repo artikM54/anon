@@ -15,7 +15,7 @@ type ChatService struct {
 	chatRepository *chatRepository.ChatRepository
 }
 
-func NewChatService(users []*userModel.User) *ChatService {
+func NewChatService(users map[string]*userModel.User) *ChatService {
 	chat := newChat(users)
 
 	return &ChatService{
@@ -24,7 +24,7 @@ func NewChatService(users []*userModel.User) *ChatService {
 	}
 }
 
-func newChat(users []*userModel.User) *chatModel.Chat {
+func newChat(users map[string]*userModel.User) *chatModel.Chat {
 	return &chatModel.Chat{
 		Hash:    hashUtil.CreateUniqueModelHash(chatModel.RedisList),
 		Users:   users,
@@ -46,6 +46,11 @@ func (c *ChatService) startHandlers() {
 
 func (c *ChatService) listening() {
 	for {
+		if c.Chat.IsEmpty() {
+			close(c.Chat.Channel)
+			return
+		}
+
 		fmt.Println("READ MESSAGE FOR chat: ", c.Chat.Hash)
 
 		message, opened := <-c.Chat.Channel
@@ -61,6 +66,10 @@ func (c *ChatService) listening() {
 
 func (c *ChatService) sending() {
 	for {
+		if c.Chat.IsEmpty() {
+			return
+		}
+
 		messages := c.chatRepository.GetNewMessages()
 		fmt.Println("SEND MESSAGE FOR CHAT ", c.Chat.Hash)
 

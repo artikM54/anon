@@ -3,8 +3,8 @@ package queue
 import (
 	userModel "anonymous_chat/internal/models/user"
 	"math/rand"
-	"time"
 	"sync"
+	"time"
 )
 
 type UserQueue struct {
@@ -46,7 +46,7 @@ func (q *UserQueue) DeleteUserFromQueue(userHash string) {
 	q.mu.Unlock()
 }
 
-func (q *UserQueue) GetRandomUsers(n int) []*userModel.User {
+func (q *UserQueue) GetRandomUsers(n int) map[string]*userModel.User {
 	rand.Seed(time.Now().UnixNano())
 
 	values := make([]*userModel.User, 0, len(q.users))
@@ -60,9 +60,11 @@ func (q *UserQueue) GetRandomUsers(n int) []*userModel.User {
 		n = len(values)
 	}
 
-	result := values[:n]
+	users := values[:n]
+	result := make(map[string]*userModel.User)
 
-	for _, user := range result {
+	for _, user := range users {
+		result[user.Hash] = user
 		q.DeleteUserFromQueue(user.Hash)
 	}
 

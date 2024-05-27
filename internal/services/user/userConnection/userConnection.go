@@ -191,4 +191,5 @@ func (u *userConnectionService) handleCaseFrontChatExitCategory(message *message
 	message.Category = messageModel.ExitCategory
 
 	handler_queue.PutIntoChat(message)
+	handler_queue.ExitUserFromChat(message)
 }
