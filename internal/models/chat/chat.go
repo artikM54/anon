@@ -1,6 +1,7 @@
 package chat
 
 import (
+	messageModel "anonymous_chat/internal/models/message"
 	userModel "anonymous_chat/internal/models/user"
 )
 
@@ -9,6 +10,26 @@ const (
 )
 
 type Chat struct {
-	Hash  string
-	Users []*userModel.User
+	Hash    string
+	Users   map[string]*userModel.User
+	Channel chan *messageModel.Message
+}
+
+func (c *Chat) IsEmpty() bool {
+	var result bool
+
+	if len(c.Users) < 2 {
+		result = true
+	} else {
+		result = false
+	}
+
+	return result
+}
+
+func (c *Chat) ExitUser(userHash string) bool {
+	_, found := c.Users[userHash]
+
+	return found
+
 }
