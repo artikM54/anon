@@ -6,13 +6,14 @@ import (
 	userModel "anonymous_chat/internal/models/user"
 	chatRepository "anonymous_chat/internal/repositories/chat"
 	hashUtil "anonymous_chat/internal/utils/hash"
-	"encoding/json"
 	"fmt"
+	"sync"
 )
 
 type ChatService struct {
 	Chat           *chatModel.Chat
 	chatRepository *chatRepository.ChatRepository
+	wg             sync.WaitGroup
 }
 
 func NewChatService(users map[string]*userModel.User) *ChatService {
@@ -36,60 +37,33 @@ func (c *ChatService) Start() {
 	fmt.Println("chat is starting")
 
 	c.notifyChatStart()
-	c.startHandlers()
+
+	c.wg.Add(1)
+	go c.handler()
+	c.wg.Wait()
 }
 
-func (c *ChatService) startHandlers() {
-	go c.listening()
-	go c.sending()
-}
-
-func (c *ChatService) listening() {
-	for {
-		if c.Chat.IsEmpty() {
-			close(c.Chat.Channel)
-			return
-		}
-
+func (c *ChatService) handler() {
+	defer c.wg.Done()
+	for message := range c.Chat.Channel {
 		fmt.Println("READ MESSAGE FOR chat: ", c.Chat.Hash)
+		if c.Chat.IsEmpty() {
+			fmt.Println("close chat")
 
-		message, opened := <-c.Chat.Channel
-		if !opened {
-			fmt.Printf("readUserMessages Channel closed for user %s\n", c.Chat.Hash)
-			return
+			close(c.Chat.Channel)
+			c.chatRepository.DeleteChat()
 		}
 
 		message.Payload.ChatHash = c.Chat.Hash
 		c.chatRepository.AddMessage(*message)
-	}
-}
 
-func (c *ChatService) sending() {
-	for {
-		if c.Chat.IsEmpty() {
-			return
-		}
-
-		messages := c.chatRepository.GetNewMessages()
-		fmt.Println("SEND MESSAGE FOR CHAT ", c.Chat.Hash)
-
-		for _, message := range messages {
-
-			messageData := message.Values["message"].(string)
-
-			var message messageModel.Message
-			json.Unmarshal([]byte(messageData), &message)
-
-			fmt.Println("Read message from redis message data : ", messageData)
-
-			for _, user := range c.Chat.Users {
-				if user.Hash == message.Payload.UserHash {
-					fmt.Println("CONTINUE for: ", user.Hash)
-					continue
-				}
-
-				user.PutIntoChannel(&message)
+		for _, user := range c.Chat.Users {
+			if user.Hash == message.Payload.UserHash {
+				fmt.Println("CONTINUE for: ", user.Hash)
+				continue
 			}
+
+			user.PutIntoChannel(message)
 		}
 	}
 }
@@ -102,5 +76,5 @@ func (c *ChatService) notifyChatStart() {
 		c.Chat.Hash,
 	)
 
-	c.chatRepository.AddMessage(*message)
+	c.Chat.Channel <- message
 }

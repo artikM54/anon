@@ -6,24 +6,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 )
 
 type ChatRepository struct {
-	redisListKeyParticipants string
-	redisListKeyMessages     string
-	redisStream              string
-	lastMessageId            string
-	ctx                      context.Context
+	name_list string
+	ctx       context.Context
 }
 
 func NewChatRepository(chatHash string) *ChatRepository {
 	return &ChatRepository{
-		redisListKeyParticipants: "chat_participants:" + chatHash,
-		redisListKeyMessages:     "chat_messages:" + chatHash,
-		redisStream:              "chat_stream:" + chatHash,
-		lastMessageId:            "0",
-		ctx:                      context.Background(),
+		name_list: "list_messages:" + chatHash,
+		ctx:       context.Background(),
 	}
 }
 
@@ -33,36 +26,17 @@ func (c *ChatRepository) AddMessage(message messageModel.Message) {
 		fmt.Println("AddMessage Redis Error encoding message to JSON: ", err)
 	}
 
-	redisUtil.Client.XAdd(c.ctx, &redis.XAddArgs{
-		Stream: c.redisStream,
-		Values: map[string]interface{}{
-			"message": data,
-		},
-	})
-}
-
-func (c *ChatRepository) GetNewMessages() []redis.XMessage {
-	streams, err := redisUtil.Client.XRead(c.ctx, &redis.XReadArgs{
-		Streams: []string{c.redisStream, c.lastMessageId},
-		Count:   10,
-	}).Result()
-
+	err = redisUtil.Client.RPush(c.ctx, c.name_list, string(data)).Err()
 	if err != nil {
-		fmt.Println("Error reading new messages:", err)
+		fmt.Println("AddMessage Redis Error: ", err)
 	}
-
-	messages := streams[0].Messages
-
-	if len(messages) > 0 {
-		i := len(messages) - 1
-		c.updateLastMessageId(messages[i])
-	}
-
-	return messages
 }
 
-func (c *ChatRepository) updateLastMessageId(message redis.XMessage) {
-	c.lastMessageId = message.ID
-	fmt.Println("Updated lastMessageId value:", c.lastMessageId)
-
+func (c *ChatRepository) DeleteChat() {
+	err := redisUtil.Client.Del(c.ctx, c.name_list).Err()
+	if err != nil {
+		fmt.Println("Error delete the list:", err)
+	} else {
+		fmt.Println("Success delete the list")
+	}
 }
