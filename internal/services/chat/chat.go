@@ -5,23 +5,26 @@ import (
 	messageModel "anonymous_chat/internal/models/message"
 	userModel "anonymous_chat/internal/models/user"
 	chatRepository "anonymous_chat/internal/repositories/chat"
+	"anonymous_chat/internal/repositories/chat_list"
 	hashUtil "anonymous_chat/internal/utils/hash"
 	"fmt"
 	"sync"
 )
 
 type ChatService struct {
-	Chat           *chatModel.Chat
-	chatRepository *chatRepository.ChatRepository
-	wg             sync.WaitGroup
+	Chat               *chatModel.Chat
+	chatRepository     *chatRepository.ChatRepository
+	chatListRepository *chat_list.ChatListRepository
+	wg                 sync.WaitGroup
 }
 
 func NewChatService(users map[string]*userModel.User) *ChatService {
 	chat := newChat(users)
 
 	return &ChatService{
-		Chat:           chat,
-		chatRepository: chatRepository.NewChatRepository(chat.Hash),
+		Chat:               chat,
+		chatRepository:     chatRepository.NewChatRepository(chat.Hash),
+		chatListRepository: chat_list.NewChatListRepository(),
 	}
 }
 
@@ -35,23 +38,27 @@ func newChat(users map[string]*userModel.User) *chatModel.Chat {
 
 func (c *ChatService) Start() {
 	fmt.Println("chat is starting")
+	c.chatListRepository.Add(c.Chat)
 
 	c.notifyChatStart()
 
 	c.wg.Add(1)
 	go c.handler()
 	c.wg.Wait()
+
+	c.chatRepository.DeleteChat()
+	c.chatListRepository.Delete(c.Chat.Hash)
 }
 
 func (c *ChatService) handler() {
 	defer c.wg.Done()
+
 	for message := range c.Chat.Channel {
 		fmt.Println("READ MESSAGE FOR chat: ", c.Chat.Hash)
 		if c.Chat.IsEmpty() {
-			fmt.Println("close chat")
+			fmt.Println("close chat channel")
 
 			close(c.Chat.Channel)
-			c.chatRepository.DeleteChat()
 		}
 
 		message.Payload.ChatHash = c.Chat.Hash
