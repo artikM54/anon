@@ -1,9 +1,10 @@
 package userConnection
 
 import (
-	"anonymous_chat/internal/handler_queue"
 	messageModel "anonymous_chat/internal/models/message"
 	userModel "anonymous_chat/internal/models/user"
+	"anonymous_chat/internal/repositories/chat_list"
+	"anonymous_chat/internal/repositories/user_queue"
 	hashUtil "anonymous_chat/internal/utils/hash"
 	"encoding/json"
 	"fmt"
@@ -14,16 +15,20 @@ import (
 )
 
 type userConnectionService struct {
-	conn *websocket.Conn
-	user *userModel.User
+	conn                *websocket.Conn
+	user                *userModel.User
+	chatListRepository  *chat_list.ChatListRepository
+	userQueueRepository *user_queue.UserQueueRepository
 }
 
 func NewUserConnectionService(conn *websocket.Conn) *userConnectionService {
 	user := userModel.NewUser()
 
 	return &userConnectionService{
-		conn: conn,
-		user: user,
+		conn:                conn,
+		user:                user,
+		chatListRepository:  chat_list.NewChatListRepository(),
+		userQueueRepository: user_queue.NewUserQueueRepository(),
 	}
 }
 
@@ -140,23 +145,23 @@ func (u *userConnectionService) handleCaseFrontGiveTokenCategory(message *messag
 func (u *userConnectionService) handleCaseFrontStartQueueCategory() {
 	fmt.Printf("HANDLE COMMANDS FRONT:START_QUEUE for user %s\n", u.user.Hash)
 
-	if handler_queue.Queue.ExitUserWithinQueue(u.user.Hash) {
+	if u.userQueueRepository.Exist(u.user.Hash) {
 		fmt.Printf("HANDLE COMMANDS FRONT:START_QUEUE THERE IS USER IN QUEUE %s\n", u.user.Hash)
 		return
 	}
 
-	handler_queue.Queue.AddUserToQueue(u.user)
+	u.userQueueRepository.Add(u.user)
 }
 
 func (u *userConnectionService) handleCaseFrontExitQueueCategory() {
 	fmt.Printf("HANDLE COMMANDS FRONT:QUEUE_EXIT for user %s\n", u.user.Hash)
 
-	if !handler_queue.Queue.ExitUserWithinQueue(u.user.Hash) {
+	if !u.userQueueRepository.Exist(u.user.Hash) {
 		fmt.Printf("HANDLE COMMANDS FRONT:QUEUE_EXIT there is not in queue for user %s\n", u.user.Hash)
 		return
 	}
 
-	handler_queue.Queue.DeleteUserFromQueue(u.user.Hash)
+	u.userQueueRepository.Delete(u.user.Hash)
 }
 
 func (u *userConnectionService) handleCaseChatCategory(message *messageModel.Message) {
@@ -167,12 +172,12 @@ func (u *userConnectionService) handleCaseChatCategory(message *messageModel.Mes
 		return
 	}
 
-	if !handler_queue.ExitChat(message.Payload.ChatHash) {
+	if !u.chatListRepository.ExistChat(message.Payload.ChatHash) {
 		fmt.Printf("HANDLE COMMANDS CHAT HASH is not exist; user %s\n", u.user.Hash)
 		return
 	}
 
-	handler_queue.PutIntoChat(message)
+	u.chatListRepository.PutMessageIntoChat(message)
 }
 
 func (u *userConnectionService) handleCaseFrontChatExitCategory(message *messageModel.Message) {
@@ -183,13 +188,13 @@ func (u *userConnectionService) handleCaseFrontChatExitCategory(message *message
 		return
 	}
 
-	if !handler_queue.ExitChat(message.Payload.ChatHash) {
+	if !u.chatListRepository.ExistChat(message.Payload.ChatHash) {
 		fmt.Printf("HANDLE COMMANDS FRONT:CHAT_EXIT HASH is not exist; user %s\n", u.user.Hash)
 		return
 	}
 
 	message.Category = messageModel.ExitCategory
 
-	handler_queue.PutIntoChat(message)
-	handler_queue.ExitUserFromChat(message)
+	u.chatListRepository.PutMessageIntoChat(message)
+	u.chatListRepository.ExitUserFromChat(message.Payload.ChatHash, message.Payload.UserHash)
 }

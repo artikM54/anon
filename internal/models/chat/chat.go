@@ -27,7 +27,7 @@ func (c *Chat) IsEmpty() bool {
 	return result
 }
 
-func (c *Chat) ExitUser(userHash string) bool {
+func (c *Chat) ExistUser(userHash string) bool {
 	_, found := c.Users[userHash]
 
 	return found
