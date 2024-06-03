@@ -3,6 +3,7 @@ package chat
 import (
 	messageModel "anonymous_chat/internal/models/message"
 	userModel "anonymous_chat/internal/models/user"
+	"sync"
 )
 
 const (
@@ -13,6 +14,7 @@ type Chat struct {
 	Hash    string
 	Users   map[string]*userModel.User
 	Channel chan *messageModel.Message
+	Mu      sync.Mutex
 }
 
 func (c *Chat) IsEmpty() bool {
@@ -31,5 +33,4 @@ func (c *Chat) ExistUser(userHash string) bool {
 	_, found := c.Users[userHash]
 
 	return found
-
 }

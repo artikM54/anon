@@ -4,6 +4,7 @@ import (
 	"anonymous_chat/internal/memory_storages/chat_list"
 	chatModel "anonymous_chat/internal/models/chat"
 	messageModel "anonymous_chat/internal/models/message"
+	userModel "anonymous_chat/internal/models/user"
 	"fmt"
 )
 
@@ -51,9 +52,25 @@ func (r *ChatListRepository) ExitUserFromChat(chatHash string, userHash string) 
 
 	if !found {
 		fmt.Println("Error repository exit user not found")
+		return
 	}
 
 	if chat.ExistUser(userHash) {
 		delete(chat.Users, userHash)
+	}
+}
+
+func (r *ChatListRepository) AddUserToChat(chatHash string, user *userModel.User) {
+	chat, found := r.store.Get(chatHash)
+
+	if !found {
+		fmt.Println("Error repository exit user not found")
+		return
+	}
+
+	if chat.ExistUser(user.Hash) {
+		defer chat.Mu.Unlock()
+		chat.Users[user.Hash] = user
+		chat.Mu.Lock()
 	}
 }
