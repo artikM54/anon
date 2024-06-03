@@ -5,6 +5,7 @@ import (
 	userModel "anonymous_chat/internal/models/user"
 	"anonymous_chat/internal/repositories/chat_list"
 	"anonymous_chat/internal/repositories/user_queue"
+	returnToChatService "anonymous_chat/internal/services/chat/return_chat"
 	hashUtil "anonymous_chat/internal/utils/hash"
 	"encoding/json"
 	"fmt"
@@ -114,6 +115,9 @@ func (u *userConnectionService) handleMessage(message *messageModel.Message) {
 	case messageModel.FrontChatExitCategory:
 		u.handleCaseFrontChatExitCategory(message)
 
+	case messageModel.FrontReturnToChatCategory:
+		u.handleCaseFrontReturnToChatCategory(message)
+
 	default:
 		fmt.Println("Undefined command")
 	}
@@ -197,4 +201,28 @@ func (u *userConnectionService) handleCaseFrontChatExitCategory(message *message
 
 	u.chatListRepository.PutMessageIntoChat(message)
 	u.chatListRepository.ExitUserFromChat(message.Payload.ChatHash, message.Payload.UserHash)
+}
+
+func (u *userConnectionService) handleCaseFrontReturnToChatCategory(message *messageModel.Message) {
+	fmt.Printf("HANDLE COMMANDS FRONT:RETURN_TO_CHAT for user %s\n", u.user.Hash)
+
+	if message.Payload.ChatHash == "" {
+		fmt.Printf("FRONT:RETURN_TO_CHAT CHAT HASH is empty; user %s\n", u.user.Hash)
+		return
+	}
+
+	if message.Payload.UserHash == "" {
+		fmt.Printf("FRONT:RETURN_TO_CHAT USER HASH is empty; user")
+		return
+	}
+
+	if !u.chatListRepository.ExistChat(message.Payload.ChatHash) {
+		fmt.Printf("HANDLE COMMANDS FRONT:RETURN_TO_CHAT HASH is not exist; user %s\n", u.user.Hash)
+		return
+	}
+
+	r := returnToChatService.NewReturnToChatService(message.Payload.ChatHash, u.user)
+	
+	r.ReturnToChat()
+	r.GetHistoryMessages()
 }

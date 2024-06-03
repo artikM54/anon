@@ -40,3 +40,12 @@ func (c *ChatRepository) DeleteChat() {
 		fmt.Println("Success delete the list")
 	}
 }
+
+func (c *ChatRepository) GetMessages() []string {
+	values, err := redisUtil.Client.LRange(c.ctx, c.name_list, 0, -1).Result()
+	if err != nil {
+		fmt.Println("Error getting values from Redis list:", err)
+	}
+
+	return values
+}

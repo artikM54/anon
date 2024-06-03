@@ -5,16 +5,17 @@ import (
 )
 
 const (
-	ConnectCategory         = "CONNECT"
-	TokenCategory           = "TOKEN"
-	StartCategory           = "CHAT_START"
-	ChatCategory            = "CHAT"
-	ExitCategory            = "CHAT_EXIT"
-	FrontStartQueueCategory = "FRONT:START_QUEUE"
-	FrontExitQueueCategory  = "FRONT:QUEUE_EXIT"
-	FrontChatExitCategory   = "FRONT:CHAT_EXIT"
-	FrontGetTokenCategory   = "FRONT:GET_TOKEN"
-	FrontGiveTokenCategory  = "FRONT:GIVE_TOKEN"
+	ConnectCategory           = "CONNECT"
+	TokenCategory             = "TOKEN"
+	StartCategory             = "CHAT_START"
+	ChatCategory              = "CHAT"
+	ExitCategory              = "CHAT_EXIT"
+	FrontStartQueueCategory   = "FRONT:START_QUEUE"
+	FrontExitQueueCategory    = "FRONT:QUEUE_EXIT"
+	FrontChatExitCategory     = "FRONT:CHAT_EXIT"
+	FrontGetTokenCategory     = "FRONT:GET_TOKEN"
+	FrontGiveTokenCategory    = "FRONT:GIVE_TOKEN"
+	FrontReturnToChatCategory = "FRONT:RETURN_TO_CHAT"
 )
 
 type MessagePayload struct {
