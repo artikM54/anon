@@ -143,6 +143,11 @@ func (u *userConnectionService) handleCaseFrontGetTokenCategory() {
 }
 
 func (u *userConnectionService) handleCaseFrontGiveTokenCategory(message *messageModel.Message) {
+	if message.Payload.Text == "" {
+		fmt.Printf("HANDLE COMMANDS FRONT:GIVE_TOKEN; message.Payload.Text is empty")
+		return
+	}
+
 	u.user.SetToken(message.Payload.Text)
 }
 
@@ -222,7 +227,7 @@ func (u *userConnectionService) handleCaseFrontReturnToChatCategory(message *mes
 	}
 
 	r := returnToChatService.NewReturnToChatService(message.Payload.ChatHash, u.user)
-	
+
 	r.ReturnToChat()
 	r.GetHistoryMessages()
 }
