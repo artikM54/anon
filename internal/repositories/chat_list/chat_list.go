@@ -69,6 +69,7 @@ func (r *ChatListRepository) AddUserToChat(chatHash string, user *userModel.User
 	}
 
 	if chat.ExistUser(user.Hash) {
+		fmt.Println("rewrite user in chat")
 		defer chat.Mu.Unlock()
 		chat.Users[user.Hash] = user
 		chat.Mu.Lock()
